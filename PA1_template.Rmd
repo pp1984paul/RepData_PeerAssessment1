@@ -1,25 +1,84 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("C:/Prosenjit data/Cousera/Reproducible Research")
+library(dplyr)
+```
 
 ## Loading and preprocessing the data
 
+```{r load_preprocess,echo=TRUE,cache=TRUE}
+download.file(url = "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip",destfile = "data.zip")
+unzip("data.zip")
+Masterdata<-read.csv("activity.csv")
+Masterdata$date<-strptime(Masterdata$date,"%Y-%m-%d")
+Masterdata$date<-as.Date(Masterdata$date,"%Y-%m-%d")
 
+good<-complete.cases(Masterdata$steps)
+r<-Masterdata[good,]
+```
 
 ## What is mean total number of steps taken per day?
 
+```{r totalstepstaken, echo=FALSE}
+'Histogram of the total number of steps taken each day'
 
+daywise<-r%>%group_by(r$date)%>%summarise(totalsteps=sum(steps))
+hist(daywise$totalsteps,breaks = 30,col = "red")
 
-## What is the average daily activity pattern?
+'Mean and median number of steps taken each day'
+paste ("Mean no of steps:",mean(daywise$totalsteps))
+paste ("Median no of steps:",median(daywise$totalsteps))
+```
 
+#What is the average daily activity pattern?
+```{r activitypatterns,echo=TRUE}
+intervalwise<-r%>%group_by(r$interval)%>%summarise(averagesteps=mean(steps))
+plot(x=intervalwise$`r$interval`,y=intervalwise$averagesteps,type = "l",col="blue")
 
+bestintervalrow<-which.max(intervalwise$averagesteps)
+intervalwise[bestintervalrow,]
+```
 
-## Imputing missing values
+# Strategy of Imputing missing values
 
+Strategy: Mean for that 5-minute interval
 
+```{r imput,echo=TRUE}
+s<-sum(!good)
+paste("Total no of missing values is",s)
+imputeddata<-Masterdata
+i<-1
+for(i in 1:nrow(imputeddata)){
+  if(is.na(imputeddata$steps[i])){
+    interval<-imputeddata$interval[i]
+    j<-intervalwise[intervalwise$`r$interval`==interval,]
+    imputeddata$steps[i]<-j$averagesteps
+  }
+}
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+# Histogram.Mean,Median of new imputed dataset
+
+```{r histmeanmedian,echo=TRUE}
+daywise<-imputeddata%>%group_by(imputeddata$date)%>%summarise(totalsteps=sum(steps))
+hist(daywise$totalsteps,breaks = 30,col = "red")
+paste("There is no difference in two histograms")
+
+paste ("There is no change in Mean no of steps:",mean(daywise$totalsteps))
+paste ("There is slight change in Median no of steps:",median(daywise$totalsteps))
+```
+
+#Are there differences in activity patterns between weekdays and weekends?
+```{r wdwe,echo=TRUE}
+imputeddata$day_type<-weekdays(imputeddata$date)
+imputeddata$day_type[imputeddata$day_type %in% c("Saturday","Sunday")]<-"Weekend"
+imputeddata$day_type[imputeddata$day_type !="Weekend"]<-"Weekday"
+imputeddata$day_type<-as.factor(imputeddata$day_type)
+library(ggplot2)
+a<-imputeddata %>% group_by(imputeddata$interval,imputeddata$day_type)%>%summarise(totalsteps=mean(steps))
+g<-ggplot(a,aes(`imputeddata$interval`,totalsteps))
+g+geom_line(color="red")+facet_grid(.~`imputeddata$day_type`)
+```
